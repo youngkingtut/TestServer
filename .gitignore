@@ -1,0 +1,5 @@
+# python 
+*.py[code]
+
+# pycharm
+.idea/*
