@@ -1,11 +1,9 @@
 from log import root_log
 from TestServer import TestServer
-from TestClient import TestClient
+from Config import Config
 
 
-server = TestServer('localhost', 1115)
-ip, port = server.address
-TestClient(ip, port)
+server = TestServer(Config.HOST, Config.PORT)
 try:
     server.run()
 except KeyboardInterrupt:
