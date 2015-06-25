@@ -20,9 +20,6 @@ class ClientAPI(asynchat.async_chat):
         root_log.debug('Client ' + self.client_id + ': stop')
         self.close()
 
-    def handle_error(self):
-        root_log.debug('uncaught exception')
-
     def collect_incoming_data(self, data):
         self.data = data
 
@@ -31,7 +28,7 @@ class ClientAPI(asynchat.async_chat):
 
     def send_client_id(self):
         root_log.debug('Client ' + self.client_id + ': sending unique id')
-        self.send(Config.API_ID_REQUEST + Config.API_DELIMETER +
+        self.send(Config.API_ID_REQUEST + Config.API_DELIMITER +
                   self.client_id + Config.TERMINATOR)
 
     def log_client_start(self):
@@ -48,16 +45,16 @@ class TestServer(asyncore.dispatcher):
         self.set_reuse_addr()
         self.bind((host, port))
         self.address = self.socket.getsockname()
-        self.client_guid = 0
+        self.client_id = 0
         self.listen(5)
         self.connection_made = False
 
     def handle_accept(self):
         pair = self.accept()
         if pair is not None:
-            sock, addr = pair
-            root_log.debug('Incoming connection from %s' % repr(addr))
-            ClientAPI(sock, self.get_guid())
+            sock, address = pair
+            root_log.debug('Incoming connection from %s' % repr(address))
+            ClientAPI(sock, self.get_client_id())
             self.connection_made = True
 
     def check_for_exit(self):
@@ -69,9 +66,9 @@ class TestServer(asyncore.dispatcher):
             root_log.debug('No Clients Remain')
             return False
 
-    def get_guid(self):
-        self.client_guid = self.client_guid + 1
-        return self.client_guid
+    def get_client_id(self):
+        self.client_id += 1
+        return self.client_id
 
     def run(self):
         root_log.debug('Starting session')
@@ -82,3 +79,16 @@ class TestServer(asyncore.dispatcher):
     def end(self):
         root_log.debug('Ending the session, print out metrics here')
         self.close()
+
+
+if __name__ == '__main__':
+    server = TestServer(Config.HOST, Config.PORT)
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        print "Ended via keyboard interrupt"
+    except Exception as e:
+        print root_log.debug('Faulted during execution.')
+        raise e
+    finally:
+        server.end()

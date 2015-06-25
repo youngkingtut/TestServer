@@ -8,10 +8,11 @@ class Config(object):
     TERMINATOR = '\n'
 
     HEARTBEAT_TIME = 5
+    STATS_TIME = 10
 
     API_CLOSE = 'end connection'
     API_CLIENT_START = 'start'
     API_CLIENT_END = 'end'
-    API_DELIMETER = ':'
+    API_DELIMITER = ':'
     API_ID_REQUEST = 'id request'
     API_HEARTBEAT = 'heartbeat'
