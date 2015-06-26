@@ -11,20 +11,27 @@ class ClientAPI(asynchat.async_chat):
         self.set_terminator(Config.TERMINATOR)
         self.client_id = str(client_id)
         self.data = None
+        self.message = None
         self.data_handler = {Config.API_CLIENT_START: self.log_client_start,
                              Config.API_ID_REQUEST: self.send_client_id,
                              Config.API_CLIENT_END: self.handle_close,
-                             Config.API_HEARTBEAT: self.log_heartbeat}
+                             Config.API_HEARTBEAT: self.log_heartbeat,
+                             Config.API_TEST_STATS: self.log_test_stats,
+                             Config.API_TEST_INFO: self.log_test_info,
+                             Config.API_BAD_TIMEOUT: self.log_bad_timeout}
 
     def handle_close(self):
         root_log.debug('Client ' + self.client_id + ': stop')
         self.close()
 
     def collect_incoming_data(self, data):
-        self.data = data
+        message = data.split(Config.API_DELIMITER)
+        self.data = message[0]
+        if len(message) > 1:
+            self.message = message[1]
 
     def found_terminator(self):
-        self.data_handler[self.data]()
+        self.data_handler.get(self.data, self.log_unknown)()
 
     def send_client_id(self):
         root_log.debug('Client ' + self.client_id + ': sending unique id')
@@ -36,6 +43,18 @@ class ClientAPI(asynchat.async_chat):
 
     def log_heartbeat(self):
         root_log.debug('Client ' + self.client_id + ': heartbeat')
+
+    def log_test_stats(self):
+        root_log.debug('Client ' + self.client_id + ': ' + self.message)
+
+    def log_test_info(self):
+        root_log.debug('Client ' + self.client_id + ': data roll over')
+
+    def log_bad_timeout(self):
+        root_log.debug('Client ' + self.client_id + ': timeout too low, timeout set to ' + self.message)
+
+    def log_unknown(self):
+        root_log.debug('Client ' + self.client_id + ': Unknown command from client')
 
 
 class TestServer(asyncore.dispatcher):
