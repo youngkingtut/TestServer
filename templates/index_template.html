@@ -1,0 +1,23 @@
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="templates/tablestyle.css">
+</head>
+ <table class="test_table">
+  <tr>
+    <td>Test Name</td>
+    <td>Test Parameters(secs|MB)</td>
+    <td>Start time</td>
+    <td>End time</td>
+    <td>Test Status</td>
+  </tr>
+  {% for test in tests %}
+  <tr>
+     <td>{{ test.test_name }}</td>
+     <td>{{ test.test_params }}</td>
+     <td>{{ test.start_time }}</td>
+     <td>{{ test.end_time }}</td>
+     <td>{{ test.test_status }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</html>
