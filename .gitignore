@@ -3,3 +3,6 @@
 
 # pycharm
 .idea/*
+
+# sqlite3 databases
+*.db
