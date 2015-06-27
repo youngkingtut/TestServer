@@ -1,4 +1,7 @@
 class Config(object):
+    DB_NAME = 'test_server.db'
+
+    HTTP_PORT = 8000
     PORT = 1115
     HOST = 'localhost'
 
@@ -10,21 +13,29 @@ class Config(object):
 
     TERMINATOR = '\n'
 
-    HEARTBEAT_TIME = 5
-    STATS_TIME = 9
+    HEARTBEAT_TIME = 2
+    STATS_TIME = 3
 
     API_CLOSE = 'end connection'
     API_CLIENT_START = 'start'
     API_CLIENT_END = 'end'
-    API_DELIMITER = ':'
+
+    API_DELIMITER = '//'
+    API_ARG_DELIMITER = ','
     API_ID_REQUEST = 'id request'
+    API_TEST_REQUEST = 'test request'
+
     API_HEARTBEAT = 'heartbeat'
     API_BAD_TIMEOUT = 'bad timeout'
     API_TEST_STATS = 'stats'
     API_TEST_INFO = 'test info'
 
+    TEST_FILE_WRITE = 'file write'
+    TEST_DEFAULT_TIMEOUT_SEC = 10
+    TEST_DEFAULT_FILE_SIZE_MB = 10
+    TEST_TIMEOUT_CHECK = 0.1
     TEST_DIR = './test_logs/Client'
     TEST_FILE = 'test'
-    NEEDED_CHUNKS = 2
+    TEST_MIN_FILE_WRITES = 2
 
     SERVER_DIR = './server_logs/'

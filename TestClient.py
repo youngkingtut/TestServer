@@ -1,39 +1,39 @@
 from __future__ import division
+from ast import literal_eval
 import asyncore
 import asynchat
 import socket
 import multiprocessing
-import psutil
 import time
-import datetime
 import argparse
 import sys
-import os
+import threading
 from Config import Config
 from log import root_log
+from FileWriteTest import FileWriteTest
 
 
 class TestClient(asynchat.async_chat):
-    def __init__(self, host, port, timeout, chunk_size_megabytes):
+    def __init__(self, host, port, run_test=None):
         asynchat.async_chat.__init__(self)
         self.set_terminator(Config.TERMINATOR)
-        self.timeout = timeout
-        self.chunk_size = chunk_size_megabytes
-        self.end_of_test = multiprocessing.Event()
-        self.message_queue = multiprocessing.Queue()
-        self.block_size = os.statvfs('/').f_bsize
-        self.timeout_reset = False
-        self.timeout_check()
-        self.data = None
+        self.server_header = None
+        self.server_message = []
         self.client_id = None
+        self.run_test = run_test
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((host, port))
+        self.message_handler = {Config.API_TEST_REQUEST: self.set_run_test,
+                                Config.API_ID_REQUEST: self.set_client_id}
+        self.test_handler = {Config.TEST_FILE_WRITE: FileWriteTest}
 
     def handle_connect(self):
         self.send(Config.API_CLIENT_START + Config.TERMINATOR)
-        if self.timeout_reset:
-            self.send(Config.API_BAD_TIMEOUT + Config.API_DELIMITER + str(self.timeout) + Config.TERMINATOR)
         self.send(Config.API_ID_REQUEST + Config.TERMINATOR)
+        if not self.run_test:
+            self.send(Config.API_TEST_REQUEST + Config.TERMINATOR)
+        else:
+            self.run()
 
     def handle_error(self):
         typ, val, traceback = sys.exc_info()
@@ -41,92 +41,55 @@ class TestClient(asynchat.async_chat):
         self.close()
 
     def handle_close(self):
-        self.end_of_test.set()
+        root_log.debug('Socket closed')
+        self.close()
 
     def collect_incoming_data(self, data):
-        self.data = data
+        del self.server_message[:]
+        message = data.split(Config.API_DELIMITER)
+        self.server_header = message[0]
+        for msg in message[1:]:
+            self.server_message.append(msg)
 
     def found_terminator(self):
-        server_message = self.data.split(Config.API_DELIMITER)
-        if server_message[0] == Config.API_ID_REQUEST:
-            self.client_id = server_message[1]
+        self.message_handler.get(self.server_header, self.log_unknown_server_command)()
+
+    def set_client_id(self):
+        if len(self.server_message):
+            self.client_id = self.server_message[0]
+        else:
+            root_log.debug('Id request returned no information')
+            self.close()
+
+    def set_run_test(self):
+        if len(self.server_message):
+            self.run_test = self.test_handler[self.server_message[0]](**literal_eval(self.server_message[1]))
             self.run()
+        else:
+            root_log.debug('no test found, ending session')
+            self.close()
+
+    def log_unknown_server_command(self):
+        root_log.debug('Unknown command, ending session' + self.server_header)
+        self.close()
 
     def run(self):
-        test = multiprocessing.Process(target=self.chunk_test)
-        test.start()
-        test_pid = test.pid
-        multiprocessing.Process(target=self.send_heartbeat).start()
-        multiprocessing.Process(target=self.gather_stats, args=(test_pid,)).start()
+        root_log.debug('Starting test')
+        message_queue = self.run_test.message_queue
+        test_process = threading.Thread(target=self.run_test.run)
+        test_process.start()
 
-        end_time = time.time() + self.timeout
-        while time.time() < end_time:
-            if not self.message_queue.empty():
-                self.send(self.message_queue.get())
+        while test_process.is_alive():
+            if not message_queue.empty():
+                self.send(message_queue.get())
 
+        root_log.debug('Test ended')
         self.end()
 
     def end(self):
+        root_log.debug('Ending session')
         self.send(Config.API_CLIENT_END + Config.TERMINATOR)
-        self.end_of_test.set()
         self.close()
-
-    def timeout_check(self):
-        file_name = Config.TEST_FILE + str(os.getpid())
-        buf = b'\xab' * self.block_size
-
-        start = datetime.datetime.now()
-        with open(file_name, 'wb') as f:
-            f.write(buf)
-        total_time = (datetime.datetime.now() - start).microseconds / Config.MICRO_SECONDS_PER_SECOND
-
-        os.remove(file_name)
-        min_time = ((self.chunk_size * Config.BYTES_PER_MEGABYTE) / self.block_size) * total_time * Config.NEEDED_CHUNKS
-        if min_time > self.timeout:
-            self.timeout = min_time
-            self.timeout_reset = True
-            root_log.debug('Timeout too low for chunk size. Timeout set to %d' % self.timeout)
-
-    def send_heartbeat(self):
-        while not self.end_of_test.is_set():
-            time.sleep(Config.HEARTBEAT_TIME)
-            self.message_queue.put(Config.API_HEARTBEAT + Config.TERMINATOR)
-
-    def gather_stats(self, test_pid):
-        try:
-            process = psutil.Process(test_pid)
-        except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
-            root_log.log('Stats was unable to connect to test PID with psutil module')
-            raise exc
-
-        process.cpu_percent()
-        while not self.end_of_test.is_set():
-            time.sleep(Config.STATS_TIME)
-            if process.is_running():
-                cpu = process.cpu_percent()
-                mem = process.memory_percent()
-                io = process.io_counters()
-                self.message_queue.put(Config.API_TEST_STATS + Config.API_DELIMITER +
-                                       'CPU %f%% MEM %f%% Bytes Written %d' % (cpu, mem, io.write_bytes)
-                                       + Config.TERMINATOR)
-
-    def chunk_test(self):
-        test_dir = Config.TEST_DIR + self.client_id + time.strftime('/%Y%m%d_%H%M%S')
-        if not os.path.exists(test_dir):
-            os.makedirs(test_dir)
-
-        file_number = 0
-        buf = b'\xab' * self.block_size
-        num_of_blocks = int((self.chunk_size * 1024 * 1024) / self.block_size)
-        while not self.end_of_test.is_set():
-            time.sleep(3)
-            test_file = test_dir + '/' + str(file_number)
-            file_number += 1
-            with open(test_file, 'wb') as f:
-                for _ in range(num_of_blocks):
-                    f.write(buf)
-            root_log.debug('file roll over')
-            self.message_queue.put(Config.API_TEST_INFO + Config.TERMINATOR)
 
 
 if __name__ == '__main__':
@@ -137,7 +100,7 @@ if __name__ == '__main__':
                         help='chunk size of test files')
     cmd_input = parser.parse_args()
 
-    client = TestClient(Config.HOST, Config.PORT, cmd_input.timeout, cmd_input.chunk_size)
+    client = TestClient(Config.HOST, Config.PORT)
     try:
         asyncore.loop(timeout=Config.LOOP_TIMEOUT)
     except KeyboardInterrupt:
