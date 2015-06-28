@@ -95,6 +95,7 @@ class FileWriteTest(object):
         end_time = time.time() + self.test_timeout_sec
         while time.time() < end_time:
             time.sleep(Config.TEST_TIMEOUT_CHECK)
+        root_log.debug('Test ended')
         self.end_of_test.set()
 
     def send_heartbeat(self):
@@ -102,7 +103,7 @@ class FileWriteTest(object):
         while not self.end_of_test.is_set():
             time.sleep(Config.TEST_HEARTBEAT_TIME)
             self.message_queue.put(Config.API_HEARTBEAT + Config.TERMINATOR)
-            root_log.debug('Sending Heartbeat')
+            root_log.debug('Heartbeat')
 
     def gather_stats(self, test_pid):
         """ Continues writing out cpu/mem info for input pid until end_of-test is set
@@ -126,7 +127,7 @@ class FileWriteTest(object):
             mem = 20
             self.message_queue.put(Config.API_TEST_STATS + Config.API_DELIMITER + 'CPU {} MEM {}'.format(cpu, mem)
                                    + Config.TERMINATOR)
-            root_log.debug('Sending Stats: CPU {} MEM {}'.format(cpu, mem))
+            root_log.debug('Stats: CPU {} MEM {}'.format(cpu, mem))
 
     def file_write_test(self):
         """ Write file of given file_size. When finished, write out a new file
@@ -152,4 +153,4 @@ class FileWriteTest(object):
                 os.close(file_descriptor)
                 os.remove(test_file)
                 self.message_queue.put(Config.API_TEST_FILE_WRITE + Config.TERMINATOR)
-                root_log.log('file roll over')
+                root_log.debug('file roll over')

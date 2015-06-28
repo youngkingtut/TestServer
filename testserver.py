@@ -37,7 +37,7 @@ Example:
         import Queue
 
         tests = Queue.Queue()
-        tests.put(Test(Config.TEST_FILE_WRITE, timeout=10, file_size=10))
+        tests.put(Config.TEST_FILE_WRITE(timeout=10, file_size=10))
         server = TestServer('localhost', 1123, tests)
         try:
             server.run()
@@ -48,11 +48,6 @@ Note: the only supported test is 'file write' Adding more tests will
       require interfacing with TestClient and adding the appropriate
       information to config.py.
 """
-utilities.verify_dir_exists(Config.SERVER_LOG_DIR)
-server_log = logging.FileHandler(Config.SERVER_LOG_DIR + time.strftime('%Y%m%d_%H%M%S'), 'a')
-server_log.setLevel(logging.DEBUG)
-server_log.setFormatter(utilities.file_formatter)
-root_log.addHandler(server_log)
 
 
 class TestServer(asyncore.dispatcher):
@@ -266,6 +261,12 @@ class ClientAPI(asynchat.async_chat):
 
 
 if __name__ == '__main__':
+    utilities.verify_dir_exists(Config.SERVER_LOG_DIR)
+    server_log = logging.FileHandler(Config.SERVER_LOG_DIR + time.strftime('%Y%m%d_%H%M%S'), 'a')
+    server_log.setLevel(logging.DEBUG)
+    server_log.setFormatter(utilities.file_formatter)
+    root_log.addHandler(server_log)
+
     tests = Queue.Queue()
     tests.put(Config.TEST_FILE_WRITE(timeout=10, file_size=10))
     server = TestServer(Config.HOST, Config.PORT, tests)

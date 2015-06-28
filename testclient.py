@@ -4,7 +4,9 @@ import socket
 import multiprocessing
 import argparse
 import sys
+import logging
 import utilities
+import time
 from config import Config
 from utilities import root_log
 from filewritetest import FileWriteTest
@@ -161,6 +163,12 @@ class TestClient(asynchat.async_chat):
 
 
 if __name__ == '__main__':
+    utilities.verify_dir_exists(Config.TEST_LOG_DIR)
+    test_log = logging.FileHandler(Config.TEST_LOG_DIR + time.strftime('%Y%m%d_%H%M%S'), 'a')
+    test_log.setLevel(logging.DEBUG)
+    test_log.setFormatter(utilities.file_formatter)
+    root_log.addHandler(test_log)
+
     # Spin up a client to connect to the test server. Input arguments are for the file write test,
     # more can be added to support additional tests.
     parser = argparse.ArgumentParser()
