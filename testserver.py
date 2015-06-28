@@ -51,6 +51,8 @@ Note: the only supported test is 'file write' Adding more tests will
 
 
 class TestServer(asyncore.dispatcher):
+    TESTS_RAN = 0
+    TESTS_COMPLETED = 0
     """ Initializes and runs server with asyncore loop via run method
 
         Args:
@@ -67,6 +69,9 @@ class TestServer(asyncore.dispatcher):
         self.db = None
         self.db_cursor = None
         self.connection_made = False
+        self.start_time = None
+        self.end_time = None
+        self.connections_total = 0
 
     def handle_accept(self):
         """ Spawn TestClient instance with unique id to handle connected client. """
@@ -75,6 +80,7 @@ class TestServer(asyncore.dispatcher):
             sock, address = pair
             root_log.debug('Connection from %s' % repr(address))
             ClientAPI(sock, uuid.uuid4(), self.test_queue, self.db_cursor)
+            self.connections_total += 1
             self.connection_made = True
 
     def check_for_exit(self):
@@ -126,12 +132,19 @@ class TestServer(asyncore.dispatcher):
         """ If setup succeeds, continue asyncore loop until exit status is reached. """
         root_log.debug('Starting session')
         if self.setup():
+            self.start_time = time.strftime('%Y-%m-%d_%H:%M:%S')
             while self.check_for_exit():
                 asyncore.loop(timeout=Config.LOOP_TIMEOUT, count=Config.LOOP_COUNT)
 
     def end(self):
         """ Commit statements to database and then close the connection """
-        root_log.debug('Ending the session, print out metrics here')
+        self.end_time = time.strftime('%Y-%m-%d_%H:%M:%S')
+        root_log.debug('Ending Session: Server Metrics')
+        root_log.debug('\tstart time:       {}'.format(self.start_time))
+        root_log.debug('\tend time:         {}'.format(self.end_time))
+        root_log.debug('\tconnections made: {}'.format(self.connections_total))
+        root_log.debug('\ttests ran:        {}'.format(TestServer.TESTS_RAN))
+        root_log.debug('\ttests completed:  {}'.format(TestServer.TESTS_COMPLETED))
         self.db.commit()
         self.db.close()
         self.close()
@@ -225,6 +238,7 @@ class ClientAPI(asynchat.async_chat):
     def log_client_end(self):
         root_log.debug(self.client_id + ': test finished')
         self.test_completed = True
+        TestServer.TESTS_COMPLETED += 1
         self.handle_close()
 
     def log_client_system_info(self):
@@ -241,6 +255,7 @@ class ClientAPI(asynchat.async_chat):
         root_log.debug(self.client_id + ': file roll over')
 
     def log_run_test(self):
+        TestServer.TESTS_RAN += 1
         self.start_time = time.strftime('%Y-%m-%d_%H:%M:%S')
         self.test = self.client_message[0]
         self.test_args = self.client_message[1]
@@ -267,9 +282,7 @@ if __name__ == '__main__':
     server_log.setFormatter(utilities.file_formatter)
     root_log.addHandler(server_log)
 
-    tests = Queue.Queue()
-    tests.put(Config.TEST_FILE_WRITE(timeout=10, file_size=10))
-    server = TestServer(Config.HOST, Config.PORT, tests)
+    server = TestServer(Config.HOST, Config.PORT)
     try:
         server.run()
     except KeyboardInterrupt:
