@@ -1,4 +1,3 @@
-from ast import literal_eval
 import asyncore
 import asynchat
 import socket
@@ -119,7 +118,8 @@ class TestClient(asynchat.async_chat):
         """ Sets run_test to the return packet from server if present """
         if len(self.server_message):
             root_log.debug('running test from server: {} {}'.format(self.server_message[0], self.server_message[1]))
-            self.run_test = self.test_handler[self.server_message[0]](**literal_eval(self.server_message[1]))
+            function_args = [int(arg) for arg in self.server_message[1].split(',')]
+            self.run_test = self.test_handler[self.server_message[0]](*function_args)
             self.run()
         else:
             root_log.debug('no test found, ending session')

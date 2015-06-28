@@ -216,7 +216,7 @@ class ClientAPI(asynchat.async_chat):
             self.test_args = ", ".join([str(arg) for arg in self.test])
             # Must guarantee that self.test is no longer a namedtuple after pulling information
             # this eases the write out to the db for both paths (client test or server test)
-            self.test = self.test.__name__
+            self.test = type(self.test).__name__
             test_string = self.test + Config.API_DELIMITER + self.test_args
             root_log.debug(self.client_id + ': Sending test-' + test_string)
             self.send(Config.API_TEST_REQUEST + Config.API_DELIMITER + test_string + Config.TERMINATOR)
@@ -266,7 +266,9 @@ class ClientAPI(asynchat.async_chat):
 
 
 if __name__ == '__main__':
-    server = TestServer(Config.HOST, Config.PORT)
+    tests = Queue.Queue()
+    tests.put(Config.TEST_FILE_WRITE(timeout=10, file_size=10))
+    server = TestServer(Config.HOST, Config.PORT, tests)
     try:
         server.run()
     except KeyboardInterrupt:
