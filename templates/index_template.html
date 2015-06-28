@@ -8,6 +8,7 @@
     <td>Test Parameters(secs|MB)</td>
     <td>Start time</td>
     <td>End time</td>
+    <td>Cpu info</td>
     <td>Test Status</td>
   </tr>
   {% for test in tests %}
@@ -17,6 +18,7 @@
      <td>{{ test.start_time }}</td>
      <td>{{ test.end_time }}</td>
      <td>{{ test.test_status }}</td>
+     <td>{{ test.cpu_info }}</td>
   </tr>
   {% endfor %}
 </table>
