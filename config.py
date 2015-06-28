@@ -29,21 +29,20 @@ class Config(object):
     API_ID_REQUEST = 'id request'
     API_TEST_REQUEST = 'test request'
     API_SYSTEM_INFO = 'system info'
-    API_HEARTBEAT = 'heartbeat'
     API_BAD_TIMEOUT = 'bad timeout'
     API_RUNNING_TEST = 'test start'
+    API_HEARTBEAT = 'heartbeat'
     API_TEST_STATS = 'stats'
-    API_TEST_INFO = 'test info'
+    API_TEST_FILE_WRITE = 'file write'
 
     TEST_FILE_WRITE_NAME = 'file_write'
     TEST_FILE_WRITE = namedtuple(TEST_FILE_WRITE_NAME, ['timeout', 'file_size'])
     TEST_DEFAULT_TIMEOUT_SEC = 10
     TEST_DEFAULT_FILE_SIZE_MB = 10
     TEST_TIMEOUT_CHECK = 0.1
-    TEST_DIR = './test_logs/'
-    TEST_FILE = 'timeout_test'
+    TEST_TIMEOUT_NUM_OF_BLOCKS = 256
     TEST_MIN_FILE_WRITES = 2
-    TEST_HEARTBEAT_TIME = 2
-    TEST_STATS_TIME = 3
+    TEST_HEARTBEAT_TIME = 5
+    TEST_STATS_TIME = 10
 
 

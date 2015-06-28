@@ -174,7 +174,7 @@ class ClientAPI(asynchat.async_chat):
                                 Config.API_CLIENT_END: self.log_client_end,
                                 Config.API_HEARTBEAT: self.log_heartbeat,
                                 Config.API_TEST_STATS: self.log_test_stats,
-                                Config.API_TEST_INFO: self.log_test_info,
+                                Config.API_TEST_FILE_WRITE: self.log_test_info,
                                 Config.API_BAD_TIMEOUT: self.log_bad_timeout}
 
     def handle_close(self):
@@ -226,7 +226,6 @@ class ClientAPI(asynchat.async_chat):
 
     def log_client_start(self):
         root_log.debug(self.client_id + ': start')
-        self.start_time = time.strftime('%Y-%m-%d_%H:%M:%S')
 
     def log_client_end(self):
         root_log.debug(self.client_id + ': test finished')
@@ -247,6 +246,7 @@ class ClientAPI(asynchat.async_chat):
         root_log.debug(self.client_id + ': file roll over')
 
     def log_run_test(self):
+        self.start_time = time.strftime('%Y-%m-%d_%H:%M:%S')
         self.test = self.client_message[0]
         self.test_args = self.client_message[1]
         root_log.debug(self.client_id + ': Running {} {}'.format(self.test, self.test_args))

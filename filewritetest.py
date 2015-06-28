@@ -1,4 +1,4 @@
-__author__ = 'Tristan Storz'
+from __future__ import division
 import os
 import datetime
 import time
@@ -6,6 +6,7 @@ import utilities
 import multiprocessing
 from utilities import root_log
 from config import Config
+
 """ File Write Test
 
 Test writes file_size files for timeout seconds. The test writes all
@@ -21,6 +22,7 @@ Example:
         print test.message_queue.get()
 """
 
+
 class FileWriteTest(object):
     """ Initializes test.
 
@@ -28,6 +30,7 @@ class FileWriteTest(object):
             timeout (int): test timeout time in seconds.
             file_size (int): size of files to write in MB.
     """
+
     def __init__(self, timeout=Config.TEST_DEFAULT_TIMEOUT_SEC, file_size=Config.TEST_DEFAULT_FILE_SIZE_MB):
         self.test_timeout_sec = timeout
         self.file_size_mb = file_size
@@ -35,7 +38,7 @@ class FileWriteTest(object):
         self.end_of_test = multiprocessing.Event()
         self.block_size = os.statvfs('/').f_bsize
         self.processes = []
-        # self.timeout_check()
+        self.timeout_check()
 
     @staticmethod
     def get_test_name():
@@ -45,27 +48,37 @@ class FileWriteTest(object):
         return str(dict([('timeout', self.test_timeout_sec), ('file_size', self.file_size_mb)]))
 
     def timeout_check(self):
-        """ Writes one block out to file and times it. Checks time against input time.
-            If timeout is too short, sets timeout to calculated time.
+        """ Writes one block out to file and times it. Checks time against test_timeout_sec.
+            If timeout is too short for file_size, sets test_timeout_sec to calculated time.
         """
         root_log.debug('Checking timeout')
-        file_name = Config.TEST_FILE + str(os.getpid())
-        buf = b'\xab' * self.block_size
+        utilities.verify_dir_exists(Config.TEST_LOG_DIR)
+        file_name = Config.TEST_LOG_DIR + str(os.getpid())
+        buf = b'\x50' * self.block_size
+        num_of_blocks = Config.TEST_TIMEOUT_NUM_OF_BLOCKS
 
-        start = datetime.datetime.now()
-        with open(file_name, 'wb') as f:
-            f.write(buf)
-        total_time = (datetime.datetime.now() - start).microseconds / Config.MICRO_SECONDS_PER_SECOND
+        file_descriptor = os.open(file_name, os.O_WRONLY | os.O_APPEND | os.O_DSYNC | os.O_CREAT)
+        try:
+            start = datetime.datetime.now()
+            for _ in xrange(num_of_blocks):
+                os.write(file_descriptor, buf)
+            total_time = (datetime.datetime.now() - start)
+        except Exception as e:
+            root_log.debug('failed to write temp file {}'.format(file_name))
+            raise e
+        finally:
+            os.close(file_descriptor)
+            os.remove(file_name)
 
-        os.remove(file_name)
+        total_time = total_time.seconds + (total_time.microseconds / Config.MICRO_SECONDS_PER_SECOND)
         min_time = ((self.file_size_mb * Config.BYTES_PER_MEGABYTE) /
-                    self.block_size) * total_time * Config.TEST_MIN_FILE_WRITES
+                    (num_of_blocks * self.block_size)) * total_time * Config.TEST_MIN_FILE_WRITES
         if min_time > self.test_timeout_sec:
             self.test_timeout_sec = min_time
             self.message_queue.put(Config.API_BAD_TIMEOUT + Config.API_DELIMITER)
-            root_log.debug('Timeout too low for file size. Timeout set to %d' % self.test_timeout_sec)
+            root_log.debug('Timeout too low for file size. Timeout set to %f' % self.test_timeout_sec)
         else:
-            root_log.debug('Timeout checks out for given file size')
+            root_log.debug('Timeout is over {} no need to change timeout for test'.format(min_time))
 
     def run(self):
         """ Spawns three processes and then waits for test time to end.
@@ -120,17 +133,20 @@ class FileWriteTest(object):
         """
         utilities.verify_dir_exists(Config.TEST_LOG_DIR)
 
-        # file_number = 0
-        # buf = b'\xab' * self.block_size
-        # num_of_blocks = int((self.file_size_mb * Config.BYTES_PER_MEGABYTE) / self.block_size)
+        file_number = 0
+        buf = b'\xab' * self.block_size
+        num_of_blocks = int((self.file_size_mb * Config.BYTES_PER_MEGABYTE) / self.block_size)
         while not self.end_of_test.is_set():
-            time.sleep(5)
-            # test_file = test_dir + '/' + str(file_number)
-            # file_number += 1
-            # with open(test_file, 'wb') as f:
-            #     for _ in range(num_of_blocks):
-            #         f.write(buf)
-            # os.remove(test_file)
-            # if not self.end_of_test.is_set():
-            #     root_log.debug('file roll over')
-            #     self.message_queue.put(Config.API_TEST_INFO + Config.TERMINATOR)
+            test_file = Config.TEST_LOG_DIR + str(os.getpid()) + str(file_number)
+            file_number += 1
+            file_descriptor = os.open(test_file,  os.O_WRONLY | os.O_APPEND | os.O_DSYNC | os.O_CREAT)
+            try:
+                for _ in xrange(num_of_blocks):
+                    os.write(file_descriptor, buf)
+            except Exception as e:
+                root_log.debug('failed to write temp file {}'.format(test_file))
+                raise e
+            finally:
+                os.close(file_descriptor)
+                os.remove(test_file)
+                self.message_queue.put(Config.API_TEST_FILE_WRITE + Config.TERMINATOR)
