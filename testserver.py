@@ -13,7 +13,7 @@ import uuid
 import logging
 import utilities
 from config import Config
-from utilities import root_log
+from loggers import server_log, file_formatter
 """ Test Server for logging information from concurrent clients running tests.
 
 The TestServer class utilizes asyncore to monitor a host:port and
@@ -75,13 +75,22 @@ class TestServer(asyncore.dispatcher):
         self.start_time = None
         self.end_time = None
         self.connections_total = 0
+        self.setup_log_file()
+
+    @staticmethod
+    def setup_log_file():
+        utilities.verify_dir_exists(Config.SERVER_LOG_DIR)
+        server_log_file = logging.FileHandler(Config.SERVER_LOG_DIR + time.strftime('%Y%m%d_%H%M%S'), 'a')
+        server_log_file.setLevel(logging.DEBUG)
+        server_log_file.setFormatter(file_formatter)
+        server_log.addHandler(server_log_file)
 
     def handle_accept(self):
         """ Spawn TestClient instance with unique id to handle connected client. """
         pair = self.accept()
         if pair is not None:
             sock, address = pair
-            root_log.debug('Connection from %s' % repr(address))
+            server_log.debug('Connection from %s' % repr(address))
             ClientAPI(sock, uuid.uuid4(), self.test_queue, self.db_cursor)
             self.connections_total += 1
             self.connection_made = True
@@ -98,7 +107,7 @@ class TestServer(asyncore.dispatcher):
         elif not self.connection_made:
             return True
         else:
-            root_log.debug('No Clients Remain')
+            server_log.debug('No Clients Remain')
             return False
 
     def initialize_database(self):
@@ -126,18 +135,18 @@ class TestServer(asyncore.dispatcher):
             Return:
                 bool: True if no errors occur with sockets or db.
         """
-        root_log.debug('Setting up server')
+        server_log.debug('Setting up server')
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.bind((self.host, self.port))
         self.set_reuse_addr()
         self.listen(5)
         self.initialize_database()
-        root_log.debug('Setup successful')
+        server_log.debug('Setup successful')
         return True
 
     def run(self):
         """ If setup succeeds, continue asyncore loop until exit status is reached. """
-        root_log.debug('Starting session')
+        server_log.debug('Starting session')
         if self.setup():
             self.start_time = time.strftime('%Y-%m-%d_%H:%M:%S')
             while self.check_for_exit():
@@ -146,14 +155,15 @@ class TestServer(asyncore.dispatcher):
     def end(self):
         """ Commit statements to database and then close the connection """
         self.end_time = time.strftime('%Y-%m-%d_%H:%M:%S')
-        root_log.debug('Ending Session: Server Metrics')
-        root_log.debug('\tstart time:       {}'.format(self.start_time))
-        root_log.debug('\tend time:         {}'.format(self.end_time))
-        root_log.debug('\tconnections made: {}'.format(self.connections_total))
-        root_log.debug('\ttests ran:        {}'.format(TestServer.TESTS_RAN))
-        root_log.debug('\ttests completed:  {}'.format(TestServer.TESTS_COMPLETED))
-        self.db.commit()
-        self.db.close()
+        server_log.debug('Ending Session: Server Metrics')
+        server_log.debug('\tstart time:       {}'.format(self.start_time))
+        server_log.debug('\tend time:         {}'.format(self.end_time))
+        server_log.debug('\tconnections made: {}'.format(self.connections_total))
+        server_log.debug('\ttests ran:        {}'.format(TestServer.TESTS_RAN))
+        server_log.debug('\ttests completed:  {}'.format(TestServer.TESTS_COMPLETED))
+        if self.db:
+            self.db.commit()
+            self.db.close()
         self.close()
 
 
@@ -204,7 +214,7 @@ class ClientAPI(asynchat.async_chat):
 
     def handle_close(self):
         """ Records test status and shutdowns socket. """
-        root_log.debug(self.client_id + ': stop')
+        server_log.debug(self.client_id + ': stop')
         if self.test_completed:
             self.test_status = 'COMPLETED'
         else:
@@ -230,7 +240,7 @@ class ClientAPI(asynchat.async_chat):
 
     def send_client_id(self):
         """ Sends self.client_id. """
-        root_log.debug(self.client_id + ': sending id')
+        server_log.debug(self.client_id + ': sending id')
         self.send(Config.API_ID_REQUEST + Config.API_DELIMITER +
                   self.client_id + Config.TERMINATOR)
 
@@ -243,38 +253,38 @@ class ClientAPI(asynchat.async_chat):
             # this eases the write out to the db for both paths (client test or server test)
             self.test = type(self.test).__name__
             test_string = self.test + Config.API_DELIMITER + self.test_args
-            root_log.debug(self.client_id + ': Sending test-' + test_string)
+            server_log.debug(self.client_id + ': Sending test-' + test_string)
             self.send(Config.API_TEST_REQUEST + Config.API_DELIMITER + test_string + Config.TERMINATOR)
         else:
-            root_log.debug(self.client_id + ': test queue is empty, no test sent')
+            server_log.debug(self.client_id + ': test queue is empty, no test sent')
             self.send(Config.API_TEST_REQUEST + Config.TERMINATOR)
 
     def log_client_start(self):
-        root_log.debug(self.client_id + ': start')
+        server_log.debug(self.client_id + ': start')
 
     def log_client_end(self):
-        root_log.debug(self.client_id + ': test finished')
+        server_log.debug(self.client_id + ': test finished')
         self.test_completed = True
         TestServer.TESTS_COMPLETED += 1
         self.handle_close()
 
     def log_client_system_info(self):
         self.client_cpu_info = self.client_message[0]
-        root_log.debug(self.client_id + ': system info gathered')
+        server_log.debug(self.client_id + ': system info gathered')
 
     def log_heartbeat(self):
-        root_log.debug(self.client_id + ': heartbeat')
+        server_log.debug(self.client_id + ': heartbeat')
 
     def log_test_stats(self):
         self.stat_tick += 1
         self.cpu_total += float(self.client_message[1])
         self.mem_total += float(self.client_message[3])
-        root_log.debug(self.client_id + ': ' + ' '.join(str(msg) for msg in self.client_message))
+        server_log.debug(self.client_id + ': ' + ' '.join(str(msg) for msg in self.client_message))
 
     def log_test_info(self):
         self.files_written += 1
         self.write_stop = time.time()
-        root_log.debug(self.client_id + ': file roll over')
+        server_log.debug(self.client_id + ': file roll over')
 
     def log_run_test(self):
         TestServer.TESTS_RAN += 1
@@ -282,13 +292,13 @@ class ClientAPI(asynchat.async_chat):
         self.write_start = time.time()
         self.test = self.client_message[0]
         self.test_args = self.client_message[1]
-        root_log.debug(self.client_id + ': Running {} {}'.format(self.test, self.test_args))
+        server_log.debug(self.client_id + ': Running {} {}'.format(self.test, self.test_args))
 
     def log_bad_timeout(self):
-        root_log.debug(self.client_id + ': timeout too low, timeout set to ' + self.client_message[0])
+        server_log.debug(self.client_id + ': timeout too low, timeout set to ' + self.client_message[0])
 
     def log_unknown(self):
-        root_log.debug(self.client_id + ': Unknown command from client({})'.format(self.client_header))
+        server_log.debug(self.client_id + ': Unknown command from client({})'.format(self.client_header))
 
     def write_to_db(self):
         """ Write out test information to database. """
@@ -297,28 +307,20 @@ class ClientAPI(asynchat.async_chat):
                 self.avg_cpu = self.mem_total / self.stat_tick
                 self.avg_mem = self.cpu_total / self.stat_tick
             if self.test == Config.TEST_FILE_WRITE_NAME:
-                print 'enterin this shit'
                 arg_dict = literal_eval(self.test_args)
                 self.avg_write_speed = (self.files_written * arg_dict['file_size']) / (self.write_stop - self.write_start)
-                print self.avg_write_speed
             entries = (self.test + '\n' + self.test_args, self.start_time, self.end_time, self.files_written,
                        self.avg_write_speed, self.avg_cpu, self.avg_mem, self.client_cpu_info, self.test_status)
             self.db_cursor.execute('INSERT INTO tests VALUES (?,?,?,?,?,?,?,?,?);', entries)
 
 if __name__ == '__main__':
-    utilities.verify_dir_exists(Config.SERVER_LOG_DIR)
-    server_log = logging.FileHandler(Config.SERVER_LOG_DIR + time.strftime('%Y%m%d_%H%M%S'), 'a')
-    server_log.setLevel(logging.DEBUG)
-    server_log.setFormatter(utilities.file_formatter)
-    root_log.addHandler(server_log)
-
     server = TestServer(Config.HOST, Config.PORT)
     try:
         server.run()
     except KeyboardInterrupt:
         print "Ended via keyboard interrupt"
     except Exception as e:
-        print root_log.debug('Faulted during execution.')
+        print server_log.debug('Faulted during execution.')
         raise e
     finally:
         server.end()

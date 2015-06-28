@@ -1,5 +1,4 @@
 __author__ = 'Tristan Storz'
-import logging
 import os
 import subprocess
 from config import Config
@@ -8,18 +7,9 @@ LINUX_MEM_INFO_LOCATION = '/proc/meminfo'
 LINUX_STAT_LOCATION = '/proc/stat'
 LINUX_PROCESS_STAT_LOCATION = '/proc/%d/stat'
 
-console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
-console.setFormatter(logging.Formatter('%(module)ls(%(asctime)s)- %(message)s', datefmt='%H:%M:%S'))
-
-file_formatter = logging.Formatter('%(asctime)s- %(message)s', datefmt='%Y%m%d(%H:%M:%S)')
-
-root_log = logging.getLogger("Root_log")
-root_log.setLevel(logging.DEBUG)
-root_log.addHandler(console)
-
 
 def get_total_cpu_clock_cycles():
+    """ Returns the total cpu cycles from /proc/stat """
     try:
         with open(LINUX_STAT_LOCATION, 'r') as f:
             cpu_entries = f.readline().split(' ')
@@ -36,6 +26,7 @@ def get_total_cpu_clock_cycles():
 
 
 def get_cpu_clock_cycles_of_pid(pid):
+    """ Returns the total cpu cycles for pid from /proc/[pid]/stat """
     try:
         with open(LINUX_PROCESS_STAT_LOCATION % pid, 'r') as f:
             pid_entries = f.read().split(' ')
@@ -49,6 +40,7 @@ def get_cpu_clock_cycles_of_pid(pid):
 
 
 def get_cpu_info():
+    """ Returns all cpu from lscpu command as a string """
     try:
         cpu_info = subprocess.check_output('lscpu')
         return cpu_info
@@ -57,6 +49,7 @@ def get_cpu_info():
 
 
 def get_total_memory():
+    """ Returns the total memory for system from /proc/meminfo """
     try:
         with open(LINUX_MEM_INFO_LOCATION, 'r') as f:
             mem_entries = f.readline().split(' ')
@@ -73,6 +66,7 @@ def get_total_memory():
 
 
 def get_memory_of_pid(pid):
+    """ Returns the total virtual memory for pid from /proc/[pid]/stat """
     try:
         with open(LINUX_PROCESS_STAT_LOCATION % pid, 'r') as f:
             pid_entries = f.read().split(' ')
@@ -86,6 +80,7 @@ def get_memory_of_pid(pid):
 
 
 def verify_dir_exists(directory):
+    """ Creates directory if path does not exist """
     if not os.path.exists(directory):
         try:
             os.makedirs(directory)

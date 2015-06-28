@@ -6,7 +6,7 @@ import datetime
 import time
 import utilities
 import multiprocessing
-from utilities import root_log
+from loggers import test_log
 from config import Config
 """ File Write Test
 
@@ -52,7 +52,7 @@ class FileWriteTest(object):
         """ Writes one block out to file and times it. Checks time against test_timeout_sec.
             If timeout is too short for file_size, sets test_timeout_sec to calculated time.
         """
-        root_log.debug('Checking timeout')
+        test_log.debug('Checking timeout')
         utilities.verify_dir_exists(Config.TEST_LOG_DIR)
         file_name = Config.TEST_LOG_DIR + str(os.getpid())
         buf = b'\x50' * self.block_size
@@ -65,7 +65,7 @@ class FileWriteTest(object):
                 os.write(file_descriptor, buf)
             total_time = (datetime.datetime.now() - start)
         except Exception as e:
-            root_log.debug('failed to write temp file {}'.format(file_name))
+            test_log.debug('failed to write temp file {}'.format(file_name))
             raise e
         finally:
             os.close(file_descriptor)
@@ -77,25 +77,25 @@ class FileWriteTest(object):
         if min_time > self.test_timeout_sec:
             self.test_timeout_sec = min_time
             self.message_queue.put(Config.API_BAD_TIMEOUT + Config.API_DELIMITER)
-            root_log.debug('Timeout too low for file size. Timeout set to {}'.format(self.test_timeout_sec))
+            test_log.debug('Timeout too low for file size. Timeout set to {}'.format(self.test_timeout_sec))
 
     def run(self):
         """ Spawns three processes and then waits for test time to end.
             Upon ending, sets the end_of_test Event to signal that the
             three processes should end.
         """
-        root_log.debug('Creating processes')
+        test_log.debug('Creating processes')
         test = multiprocessing.Process(target=self.file_write_test)
         test.start()
         test_pid = test.pid
         multiprocessing.Process(target=self.send_heartbeat).start()
         multiprocessing.Process(target=self.gather_stats, args=(test_pid,)).start()
 
-        root_log.debug('Beginning test loop')
+        test_log.debug('Beginning test loop')
         end_time = time.time() + self.test_timeout_sec
         while time.time() < end_time:
             time.sleep(Config.TEST_TIMEOUT_CHECK)
-        root_log.debug('Test ended')
+        test_log.debug('Test ended')
         self.end_of_test.set()
 
     def send_heartbeat(self):
@@ -103,7 +103,7 @@ class FileWriteTest(object):
         while not self.end_of_test.is_set():
             time.sleep(Config.TEST_HEARTBEAT_TIME)
             self.message_queue.put(Config.API_HEARTBEAT + Config.TERMINATOR)
-            root_log.debug('Heartbeat')
+            test_log.debug('Heartbeat')
 
     def gather_stats(self, test_pid):
         """ Continues writing out cpu/mem info for input pid until end_of-test is set
@@ -126,12 +126,12 @@ class FileWriteTest(object):
                     cpu = (cpu_pid_new - cpu_pid_old) / (cpu_total_new - cpu_total_old)
             except IOError:
                 if not self.end_of_test.is_set():
-                    root_log('file write test process data could not be gathered from Linux proc files')
+                    test_log('file write test process data could not be gathered from Linux proc files')
                 return
             self.message_queue.put(Config.API_TEST_STATS + Config.API_DELIMITER + 'CPU' + Config.API_DELIMITER +
                                    str(cpu) + Config.API_DELIMITER + 'MEM' + Config.API_DELIMITER + str(mem)
                                    + Config.TERMINATOR)
-            root_log.debug('Stats: CPU {:3.5f}%% MEM {:3.5f}%%'.format(cpu, mem))
+            test_log.debug('Stats: CPU {:3.5f}%% MEM {:3.5f}%%'.format(cpu, mem))
 
     def file_write_test(self):
         """ Write file of given file_size. When finished, write out a new file
@@ -151,10 +151,10 @@ class FileWriteTest(object):
                 for _ in xrange(num_of_blocks):
                     os.write(file_descriptor, buf)
             except Exception as e:
-                root_log.debug('failed to write temp file {}'.format(test_file))
+                test_log.debug('failed to write temp file {}'.format(test_file))
                 raise e
             finally:
                 os.close(file_descriptor)
                 os.remove(test_file)
                 self.message_queue.put(Config.API_TEST_FILE_WRITE + Config.TERMINATOR)
-                root_log.debug('file roll over')
+                test_log.debug('file roll over')
