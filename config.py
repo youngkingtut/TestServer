@@ -13,6 +13,7 @@ class Config(object):
     SERVER_LOG_DIR = './server_logs/'
     TEST_LOG_DIR = './test_logs/'
 
+    BYTES_PER_KILOBYTE = 1024
     BYTES_PER_MEGABYTE = 1024 * 1024
     MICRO_SECONDS_PER_SECOND = 1000000
 
@@ -43,6 +44,6 @@ class Config(object):
     TEST_TIMEOUT_NUM_OF_BLOCKS = 256
     TEST_MIN_FILE_WRITES = 2
     TEST_HEARTBEAT_TIME = 5
-    TEST_STATS_TIME = 10
+    TEST_STATS_TIME = 2
 
 

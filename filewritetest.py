@@ -76,8 +76,6 @@ class FileWriteTest(object):
             self.test_timeout_sec = min_time
             self.message_queue.put(Config.API_BAD_TIMEOUT + Config.API_DELIMITER)
             root_log.debug('Timeout too low for file size. Timeout set to {}'.format(self.test_timeout_sec))
-        else:
-            root_log.debug('Timeout for test is over calculated time from timeout_check {}'.format(min_time))
 
     def run(self):
         """ Spawns three processes and then waits for test time to end.
@@ -91,7 +89,7 @@ class FileWriteTest(object):
         multiprocessing.Process(target=self.send_heartbeat).start()
         multiprocessing.Process(target=self.gather_stats, args=(test_pid,)).start()
 
-        root_log.debug('Beginning wait loop')
+        root_log.debug('Beginning test loop')
         end_time = time.time() + self.test_timeout_sec
         while time.time() < end_time:
             time.sleep(Config.TEST_TIMEOUT_CHECK)
@@ -110,24 +108,26 @@ class FileWriteTest(object):
             Args:
                 test_pid (int): pid of process to monitor.
         """
-        cpu = 0
-        cpu_pid_new = 0
+        cpu, cpu_total_new, cpu_pid_new = 0, 0, 0
         while not self.end_of_test.is_set():
             time.sleep(Config.TEST_STATS_TIME)
             try:
                 cpu_pid_old = cpu_pid_new
+                cpu_total_old = cpu_total_new
                 cpu_pid_new = utilities.get_cpu_clock_cycles_of_pid(test_pid)
-                cpu_total = utilities.get_total_cpu_clock_cycles()
-                if not cpu_total and not cpu_pid_new:
-                    cpu = (cpu_pid_new - cpu_pid_old) / cpu_total
+                cpu_total_new = utilities.get_total_cpu_clock_cycles()
+                mem_total = utilities.get_total_memory()
+                if mem_total:
+                    mem = utilities.get_memory_of_pid(test_pid) / mem_total
+                if cpu_total_new and cpu_pid_new:
+                    cpu = (cpu_pid_new - cpu_pid_old) / (cpu_total_new - cpu_total_old)
             except IOError:
                 if not self.end_of_test.is_set():
                     root_log('file write test process data could not be gathered from Linux proc files')
                 return
-            mem = 20
             self.message_queue.put(Config.API_TEST_STATS + Config.API_DELIMITER + 'CPU {} MEM {}'.format(cpu, mem)
                                    + Config.TERMINATOR)
-            root_log.debug('Stats: CPU {} MEM {}'.format(cpu, mem))
+            root_log.debug('Stats: CPU {:3.5f}%% MEM {:3.5f}%%'.format(cpu, mem))
 
     def file_write_test(self):
         """ Write file of given file_size. When finished, write out a new file

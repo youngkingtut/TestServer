@@ -3,7 +3,7 @@ import logging
 import os
 import subprocess
 
-
+LINUX_MEM_INFO_LOCATION = '/proc/meminfo'
 LINUX_STAT_LOCATION = '/proc/stat'
 LINUX_PROCESS_STAT_LOCATION = '/proc/%d/stat'
 
@@ -53,6 +53,36 @@ def get_cpu_info():
         return cpu_info
     except OSError:
         return None
+
+
+def get_total_memory():
+    try:
+        with open(LINUX_MEM_INFO_LOCATION, 'r') as f:
+            mem_entries = f.readline().split(' ')
+    except IOError:
+        print 'fuck'
+        return None
+
+    memory = 0
+    for entry in mem_entries:
+        try:
+            memory += int(entry)
+        except ValueError:
+            pass
+    return memory * 1024
+
+
+def get_memory_of_pid(pid):
+    try:
+        with open(LINUX_PROCESS_STAT_LOCATION % pid, 'r') as f:
+            pid_entries = f.read().split(' ')
+    except IOError:
+        return None
+
+    pid_mem = 0
+    if len(pid_entries) > 23:
+        pid_mem = int(pid_entries[22])
+    return pid_mem
 
 
 def verify_dir_exists(directory):
