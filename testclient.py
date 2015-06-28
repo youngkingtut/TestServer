@@ -1,3 +1,4 @@
+__author__ = 'Tristan Storz'
 import asyncore
 import asynchat
 import socket

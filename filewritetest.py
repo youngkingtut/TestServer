@@ -1,6 +1,5 @@
 from __future__ import division
 __author__ = 'Tristan Storz'
-
 import os
 import datetime
 import time

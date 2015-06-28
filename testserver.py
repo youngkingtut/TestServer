@@ -1,6 +1,5 @@
 from __future__ import division
 __author__ = 'Tristan Storz'
-
 from ast import literal_eval
 import asyncore
 import asynchat
