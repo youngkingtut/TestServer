@@ -45,5 +45,3 @@ class Config(object):
     TEST_MIN_FILE_WRITES = 2
     TEST_HEARTBEAT_TIME = 5
     TEST_STATS_TIME = 2
-
-

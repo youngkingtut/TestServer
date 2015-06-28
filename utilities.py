@@ -2,6 +2,7 @@ __author__ = 'Tristan Storz'
 import logging
 import os
 import subprocess
+from config import Config
 
 LINUX_MEM_INFO_LOCATION = '/proc/meminfo'
 LINUX_STAT_LOCATION = '/proc/stat'
@@ -60,7 +61,6 @@ def get_total_memory():
         with open(LINUX_MEM_INFO_LOCATION, 'r') as f:
             mem_entries = f.readline().split(' ')
     except IOError:
-        print 'fuck'
         return None
 
     memory = 0
@@ -69,7 +69,7 @@ def get_total_memory():
             memory += int(entry)
         except ValueError:
             pass
-    return memory * 1024
+    return memory * Config.BYTES_PER_KILOBYTE
 
 
 def get_memory_of_pid(pid):
