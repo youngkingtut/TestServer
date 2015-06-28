@@ -1,5 +1,4 @@
 __author__ = 'Tristan Storz'
-from ast import literal_eval
 import asyncore
 import asynchat
 import socket
@@ -8,6 +7,8 @@ import sqlite3
 import os
 import time
 import uuid
+import logging
+import utilities
 from config import Config
 from utilities import root_log
 """ Test Server for logging information from concurrent clients running tests.
@@ -47,6 +48,11 @@ Note: the only supported test is 'file write' Adding more tests will
       require interfacing with TestClient and adding the appropriate
       information to config.py.
 """
+utilities.verify_dir_exists(Config.SERVER_LOG_DIR)
+server_log = logging.FileHandler(Config.SERVER_LOG_DIR + time.strftime('%Y%m%d_%H%M%S'), 'a')
+server_log.setLevel(logging.DEBUG)
+server_log.setFormatter(utilities.file_formatter)
+root_log.addHandler(server_log)
 
 
 class TestServer(asyncore.dispatcher):
@@ -97,8 +103,7 @@ class TestServer(asyncore.dispatcher):
             self.db = sqlite3.connect(Config.DB_NAME)
             self.db_cursor = self.db.cursor()
             self.db_cursor.execute('''CREATE TABLE tests
-                                    (test_name text,
-                                     test_params text,
+                                    (test text,
                                      start_time text,
                                      end_time text,
                                      cpu_info text,
@@ -153,6 +158,7 @@ class ClientAPI(asynchat.async_chat):
         self.client_header = None
         self.client_message = []
         self.test = None
+        self.test_args = None
         self.test_status = 'NOT RUN'
         self.test_completed = False
         self.start_time = ''
@@ -180,7 +186,6 @@ class ClientAPI(asynchat.async_chat):
             self.test_status = 'ABORTED'
         self.end_time = time.strftime('%Y-%m-%d_%H:%M:%S')
         self.write_to_db()
-        self.shutdown(socket.SHUT_RDWR)
         self.close()
 
     def collect_incoming_data(self, data):
@@ -208,7 +213,11 @@ class ClientAPI(asynchat.async_chat):
         """ Sends test from queue if non empty, otherwise sends None. """
         if not self.test_queue.empty():
             self.test = self.test_queue.get()
-            test_string = self.test.test_name + Config.API_DELIMITER + str(self.test.test_kwargs)
+            self.test_args = ", ".join([str(arg) for arg in self.test])
+            # Must guarantee that self.test is no longer a namedtuple after pulling information
+            # this eases the write out to the db for both paths (client test or server test)
+            self.test = self.test.__name__
+            test_string = self.test + Config.API_DELIMITER + self.test_args
             root_log.debug(self.client_id + ': Sending test-' + test_string)
             self.send(Config.API_TEST_REQUEST + Config.API_DELIMITER + test_string + Config.TERMINATOR)
         else:
@@ -238,8 +247,9 @@ class ClientAPI(asynchat.async_chat):
         root_log.debug(self.client_id + ': file roll over')
 
     def log_run_test(self):
-        self.test = Test(self.client_message[0], **literal_eval(self.client_message[1]))
-        root_log.debug(self.client_id + ': Running {} {}'.format(self.test.test_name, self.test.test_kwargs))
+        self.test = self.client_message[0]
+        self.test_args = self.client_message[1]
+        root_log.debug(self.client_id + ': Running {} {}'.format(self.test, self.test_args))
 
     def log_bad_timeout(self):
         root_log.debug(self.client_id + ': timeout too low, timeout set to ' + self.client_message[0])
@@ -250,25 +260,9 @@ class ClientAPI(asynchat.async_chat):
     def write_to_db(self):
         """ Write out test information to database. """
         if self.test:
-            entries = (self.test.test_name, str(self.test.test_kwargs),
-                       self.start_time, self.end_time, self.client_cpu_info, self.test_status)
-            self.db_cursor.execute('INSERT INTO tests VALUES (?,?,?,?,?,?);', entries)
-
-
-class Test(object):
-    """ Generic test object
-
-        Args:
-            test_name (str): name of test, supported tests = ['file write'].
-            **kwargs: arguments for test.
-                Example:
-                    # 'file write' test requires timeout and file_size
-                    Test('file write', timeout=1, file_size=2)
-
-    """
-    def __init__(self, test_name, **kwargs):
-        self.test_name = test_name
-        self.test_kwargs = kwargs
+            entries = (self.test + '\n' + self.test_args, self.start_time, self.end_time, self.client_cpu_info,
+                       self.test_status)
+            self.db_cursor.execute('INSERT INTO tests VALUES (?,?,?,?,?);', entries)
 
 
 if __name__ == '__main__':

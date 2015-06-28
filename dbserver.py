@@ -12,11 +12,10 @@ if __name__ == '__main__':
 
     db = sqlite3.connect(Config.DB_NAME)
     try:
-        cursor = db.execute('SELECT * FROM tests;')
+        test_entries = db.execute('SELECT * FROM tests;')
         tests = []
-        for row in cursor:
-            test = dict(test_name=row[0], test_params=row[1], start_time=row[2], end_time=row[3], test_status=row[4],
-                        cpu_info=row[5])
+        for entry in test_entries:
+            test = dict(test=entry[0], start_time=entry[1], end_time=entry[2], test_status=entry[3], cpu_info=entry[4])
             tests.append(test)
     except sqlite3.OperationalError as e:
         print 'test_server.db has not been created by TestServer or cannot be found by dbserver.py'

@@ -66,7 +66,7 @@ class TestClient(asynchat.async_chat):
         self.client_id = None
         self.message_handler = {Config.API_TEST_REQUEST: self.set_run_test,
                                 Config.API_ID_REQUEST: self.set_client_id}
-        self.test_handler = {Config.TEST_FILE_WRITE: FileWriteTest}
+        self.test_handler = {Config.TEST_FILE_WRITE_NAME: FileWriteTest}
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((self.host, self.port))
 
@@ -108,7 +108,7 @@ class TestClient(asynchat.async_chat):
         self.message_handler.get(self.server_header, self.log_unknown_server_command)()
 
     def set_client_id(self):
-        """ Sets client_id to return packet from server if present. """
+        """ Sets client_id to the return packet from server if present. """
         if len(self.server_message):
             self.client_id = self.server_message[0]
             root_log.debug('id received: {}'.format(self.client_id))
@@ -117,7 +117,7 @@ class TestClient(asynchat.async_chat):
             self.handle_close()
 
     def set_run_test(self):
-        """ Sets run_test to return packet from server if present """
+        """ Sets run_test to the return packet from server if present """
         if len(self.server_message):
             root_log.debug('running test from server: {} {}'.format(self.server_message[0], self.server_message[1]))
             self.run_test = self.test_handler[self.server_message[0]](**literal_eval(self.server_message[1]))

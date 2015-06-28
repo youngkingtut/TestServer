@@ -39,7 +39,7 @@ class FileWriteTest(object):
 
     @staticmethod
     def get_test_name():
-        return Config.TEST_FILE_WRITE
+        return Config.TEST_FILE_WRITE_NAME
 
     def get_test_args(self):
         return str(dict([('timeout', self.test_timeout_sec), ('file_size', self.file_size_mb)]))
@@ -86,7 +86,7 @@ class FileWriteTest(object):
     def send_heartbeat(self):
         """ Continues writing out message event until end_of_test is set """
         while not self.end_of_test.is_set():
-            time.sleep(Config.HEARTBEAT_TIME)
+            time.sleep(Config.TEST_HEARTBEAT_TIME)
             self.message_queue.put(Config.API_HEARTBEAT + Config.TERMINATOR)
 
     def gather_stats(self, test_pid):
@@ -97,7 +97,7 @@ class FileWriteTest(object):
         cpu = 0
         cpu_pid_new = 0
         while not self.end_of_test.is_set():
-            time.sleep(Config.STATS_TIME)
+            time.sleep(Config.TEST_STATS_TIME)
             try:
                 cpu_pid_old = cpu_pid_new
                 cpu_pid_new = utilities.get_cpu_clock_cycles_of_pid(test_pid)
@@ -118,9 +118,7 @@ class FileWriteTest(object):
             with the same size. Continues until end_of_test is set. Writes out
             every time file rollover occurs.
         """
-        test_dir = Config.TEST_DIR + time.strftime('/%Y%m%d_%H:%M:%S')
-        if not os.path.exists(test_dir):
-            os.makedirs(test_dir)
+        utilities.verify_dir_exists(Config.TEST_LOG_DIR)
 
         # file_number = 0
         # buf = b'\xab' * self.block_size

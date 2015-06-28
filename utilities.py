@@ -1,5 +1,6 @@
 __author__ = 'Tristan Storz'
 import logging
+import os
 import subprocess
 
 
@@ -9,6 +10,8 @@ LINUX_PROCESS_STAT_LOCATION = '/proc/%d/stat'
 console = logging.StreamHandler()
 console.setLevel(logging.DEBUG)
 console.setFormatter(logging.Formatter('%(module)ls(%(asctime)s)- %(message)s', datefmt='%H:%M:%S'))
+
+file_formatter = logging.Formatter('%(asctime)s- %(message)s', datefmt='%Y%m%d(%H:%M:%S)')
 
 root_log = logging.getLogger("Root_log")
 root_log.setLevel(logging.DEBUG)
@@ -51,3 +54,11 @@ def get_cpu_info():
     except OSError:
         return None
 
+
+def verify_dir_exists(directory):
+    if not os.path.exists(directory):
+        try:
+            os.makedirs(directory)
+        except os.error as e:
+            print 'could not create directory {}'.format(directory)
+            raise e

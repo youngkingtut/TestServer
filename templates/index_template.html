@@ -4,8 +4,7 @@
 </head>
  <table class="test_table">
   <tr>
-    <td>Test Name</td>
-    <td>Test Parameters(secs|MB)</td>
+    <td>Test</td>
     <td>Start time</td>
     <td>End time</td>
     <td>Cpu info</td>
@@ -13,8 +12,7 @@
   </tr>
   {% for test in tests %}
   <tr>
-     <td>{{ test.test_name }}</td>
-     <td>{{ test.test_params }}</td>
+     <td>{{ test.test }}</td>
      <td>{{ test.start_time }}</td>
      <td>{{ test.end_time }}</td>
      <td>{{ test.test_status }}</td>
