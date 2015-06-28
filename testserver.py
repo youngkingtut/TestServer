@@ -1,4 +1,7 @@
+from __future__ import division
 __author__ = 'Tristan Storz'
+
+from ast import literal_eval
 import asyncore
 import asynchat
 import socket
@@ -107,6 +110,10 @@ class TestServer(asyncore.dispatcher):
                                     (test text,
                                      start_time text,
                                      end_time text,
+                                     files_written int,
+                                     write_speed int,
+                                     avg_cpu float,
+                                     avg_mem float,
                                      cpu_info text,
                                      status text);''')
         else:
@@ -174,6 +181,16 @@ class ClientAPI(asynchat.async_chat):
         self.client_cpu_info = None
         self.test_queue = test_queue
         self.db_cursor = db_cursor
+        self.files_written = 0
+        self.avg_write_speed = 0
+        self.avg_cpu = 0
+        self.avg_mem = 0
+        self.cpu_total = 0
+        self.mem_total = 0
+        self.stat_tick = 0
+        self.write_start = 0
+        self.write_stop = 0
+        self.write_time = 0
         self.message_handler = {Config.API_CLIENT_START: self.log_client_start,
                                 Config.API_ID_REQUEST: self.send_client_id,
                                 Config.API_SYSTEM_INFO: self.log_client_system_info,
@@ -249,14 +266,20 @@ class ClientAPI(asynchat.async_chat):
         root_log.debug(self.client_id + ': heartbeat')
 
     def log_test_stats(self):
-        root_log.debug(self.client_id + ': ' + self.client_message[0])
+        self.stat_tick += 1
+        self.cpu_total += float(self.client_message[1])
+        self.mem_total += float(self.client_message[3])
+        root_log.debug(self.client_id + ': ' + ' '.join(str(msg) for msg in self.client_message))
 
     def log_test_info(self):
+        self.files_written += 1
+        self.write_stop = time.time()
         root_log.debug(self.client_id + ': file roll over')
 
     def log_run_test(self):
         TestServer.TESTS_RAN += 1
         self.start_time = time.strftime('%Y-%m-%d_%H:%M:%S')
+        self.write_start = time.time()
         self.test = self.client_message[0]
         self.test_args = self.client_message[1]
         root_log.debug(self.client_id + ': Running {} {}'.format(self.test, self.test_args))
@@ -270,10 +293,17 @@ class ClientAPI(asynchat.async_chat):
     def write_to_db(self):
         """ Write out test information to database. """
         if self.test:
-            entries = (self.test + '\n' + self.test_args, self.start_time, self.end_time, self.client_cpu_info,
-                       self.test_status)
-            self.db_cursor.execute('INSERT INTO tests VALUES (?,?,?,?,?);', entries)
-
+            if self.stat_tick:
+                self.avg_cpu = self.mem_total / self.stat_tick
+                self.avg_mem = self.cpu_total / self.stat_tick
+            if self.test == Config.TEST_FILE_WRITE_NAME:
+                print 'enterin this shit'
+                arg_dict = literal_eval(self.test_args)
+                self.avg_write_speed = (self.files_written * arg_dict['file_size']) / (self.write_stop - self.write_start)
+                print self.avg_write_speed
+            entries = (self.test + '\n' + self.test_args, self.start_time, self.end_time, self.files_written,
+                       self.avg_write_speed, self.avg_cpu, self.avg_mem, self.client_cpu_info, self.test_status)
+            self.db_cursor.execute('INSERT INTO tests VALUES (?,?,?,?,?,?,?,?,?);', entries)
 
 if __name__ == '__main__':
     utilities.verify_dir_exists(Config.SERVER_LOG_DIR)

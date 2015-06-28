@@ -15,7 +15,15 @@ if __name__ == '__main__':
         test_entries = db.execute('SELECT * FROM tests;')
         tests = []
         for entry in test_entries:
-            test = dict(test=entry[0], start_time=entry[1], end_time=entry[2], test_status=entry[3], cpu_info=entry[4])
+            test = dict(test=entry[0],
+                        start_time=entry[1],
+                        end_time=entry[2],
+                        files_written=entry[3],
+                        write_speed=entry[4],
+                        avg_cpu=entry[5],
+                        avg_mem=entry[6],
+                        cpu_info=entry[7],
+                        test_status=entry[8])
             tests.append(test)
     except sqlite3.OperationalError as e:
         print 'test_server.db has not been created by TestServer or cannot be found by dbserver.py'

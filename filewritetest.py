@@ -1,4 +1,6 @@
 from __future__ import division
+__author__ = 'Tristan Storz'
+
 import os
 import datetime
 import time
@@ -117,15 +119,17 @@ class FileWriteTest(object):
                 cpu_pid_new = utilities.get_cpu_clock_cycles_of_pid(test_pid)
                 cpu_total_new = utilities.get_total_cpu_clock_cycles()
                 mem_total = utilities.get_total_memory()
-                if mem_total:
-                    mem = utilities.get_memory_of_pid(test_pid) / mem_total
+                mem_new = utilities.get_memory_of_pid(test_pid)
+                if mem_total and mem_new:
+                    mem = mem_new / mem_total
                 if cpu_total_new and cpu_pid_new:
                     cpu = (cpu_pid_new - cpu_pid_old) / (cpu_total_new - cpu_total_old)
             except IOError:
                 if not self.end_of_test.is_set():
                     root_log('file write test process data could not be gathered from Linux proc files')
                 return
-            self.message_queue.put(Config.API_TEST_STATS + Config.API_DELIMITER + 'CPU {} MEM {}'.format(cpu, mem)
+            self.message_queue.put(Config.API_TEST_STATS + Config.API_DELIMITER + 'CPU' + Config.API_DELIMITER +
+                                   str(cpu) + Config.API_DELIMITER + 'MEM' + Config.API_DELIMITER + str(mem)
                                    + Config.TERMINATOR)
             root_log.debug('Stats: CPU {:3.5f}%% MEM {:3.5f}%%'.format(cpu, mem))
 

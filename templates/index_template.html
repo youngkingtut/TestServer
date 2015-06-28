@@ -7,6 +7,10 @@
     <td>Test</td>
     <td>Start time</td>
     <td>End time</td>
+    <td>Files Written</td>
+    <td>Write Speed (Mb/s))</td>
+    <td>Average Cpu %</td>
+    <td>Average Memory %</td>
     <td>Cpu info</td>
     <td>Test Status</td>
   </tr>
@@ -15,8 +19,12 @@
      <td>{{ test.test }}</td>
      <td>{{ test.start_time }}</td>
      <td>{{ test.end_time }}</td>
-     <td>{{ test.test_status }}</td>
+     <td>{{ test.files_written }}</td>
+     <td>{{ test.write_speed }}</td>
+     <td>{{ test.avg_cpu }}</td>
+     <td>{{ test.avg_mem }}</td>
      <td>{{ test.cpu_info }}</td>
+     <td>{{ test.test_status }}</td>
   </tr>
   {% endfor %}
 </table>
